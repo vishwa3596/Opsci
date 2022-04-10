@@ -12,7 +12,7 @@ app.use(express.json())
 const clientId = "606f09d9dd417f6bd670"
 const clientSecret = "e1a9cf641711fc2f29daaa46b310ed4adb4b9fbb"
 
-app.post('/authenticate', (req, res) => {
+app.post('/authenticate', async (req, res) => {
     //console.log(req.body);
     const {code} = req.body;
     console.log(code);
@@ -20,28 +20,35 @@ app.post('/authenticate', (req, res) => {
     data.append("client_id", clientId)
     data.append("client_secret", clientSecret)
     data.append("code", code)
-    fetch(`https://github.com/login/oauth/access_token`, {
-        method: "POST",
-        body: data
-    }).then((response) => response.text())
-        .then((paramString) => {
-            let params = new URLSearchParams(paramString)
-            console.log(" The params ", params)
-            const access_token = params.get("access_token")
-            console.log("access_token ", access_token)
-            return fetch(`https://api.github.com/user`, {
+    try {
+        const response = await fetch(`https://github.com/login/oauth/access_token`, {
+            method: "POST",
+            body: data
+        })
+        if(!response.ok) {
+            throw Error(`${response.status} ${response.statusText}`)
+        }
+        const responseText = await response.text()
+        let params = new URLSearchParams(responseText)
+        const access_token = params.get("access_token")
+        try {
+            const userResponse = await  fetch(`https://api.github.com/user`, {
                 headers: {
                     Authorization: `token ${access_token}`
                 }
             })
-        }).then((response) => response.json())
-        .then((response) => {
-            console.log(response)
-            return res.status(200).json(response)
-        })
-        .catch((error) => {
-            return res.status(400).json(error)
-        })
+            if(!userResponse.ok) {
+                throw Error(`${userResponse.status} ${userResponse.statusText}`)
+            }
+            const  userInformation = await userResponse.json();
+            console.log(userInformation);
+        } catch (error) {
+            console.log("Looks like some error in fetching user Information: ", error)
+        }
+
+    } catch (error) {
+        console.log("Looks like there is a problem ", error)
+    }
 })
 
 app.listen(port, () => {
